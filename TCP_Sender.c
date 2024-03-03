@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -101,58 +102,59 @@ int main(int argc, char *argv[]){
         close(sock);
         return -1;  // Return -1 to indicate failure
     } 
-     printf("Connecting to Reciever...\n");
+    printf("connected to server...\n");
 
-     char option = 'yes';  // Initialize option to 'yes' to enter the loop at least once
-     while (option == 'yes') {
-    // Send the data.
-    int totalBytesSent = 0;  // Total bytes sent counter
+// Initialize the option variable to 'yes' to enter the loop at least once
+    char option = 'yes';
+    while (option == 'yes')
+    {
+        // Send the  data
+        int bytes_sent = 0;
+        // Continue sending until all data is sent
+        while (bytes_sent < size)
+        {
+            // Send data to the server
+            int  bytes_sent_now = send(sock, message + bytes_sent, size - bytes_sent, 0);
+            if ( bytes_sent_now < 0) // Check if sending failed
+            {
 
-    do {
-        // Send remaining data to server
-        int bytesSent = send(sock, message + totalBytesSent, size - totalBytesSent, 0);
-        if (bytesSent < 0) {  // Check if sending failed
-            perror("send(2)");
-            close(sock);
-            return 1;  // Return 1 to indicate failure
+                perror("send(2)");
+                close(sock);
+                return 1;
+            }
+            bytes_sent +=  bytes_sent_now;// Update the total bytes sent counter
+            printf("Sent %d bytes\n", bytes_sent);
         }
-         totalBytesSent += bytesSent;  // Update total bytes sent counter
-    } while (totalBytesSent < size);  // Continue sending until all data is sent
+          // Send the "Finish" message to the server indicating that the data transfer is complete
+        char* finishMessage = "Finish\n";
+        send(sock, finishMessage, strlen(finishMessage), 0);
 
-    printf("the data sent successfully\n");
+ // Prompt the user whether they want to send the message again
+        printf("Do you want to send the message again? (yes/no): ");
+        scanf(" %c", &option);// Read the user's input
+         getchar();
+    }
 
-     // Send finish message to the server
-    char* finish= "Finish\n";
-    send(sock, finish, strlen(finish), 0);
+   // Send the "Exit" message to the server to terminate the connection
+    printf("Sending exit message to the server\n");
+    char* exitMessage = "Exit\n";
+    send(sock, exitMessage, strlen(exitMessage), 0);
+    printf("exit message was sent\n");
 
-    printf("Do you want to send the file again? (yes/no): ");
-    scanf(" %c", &option);  // Prompt user to send message again
-}
-// Send exit message to the server
-printf("Sending exit message to the server\n");
-char* mssg = "exit\n";
-send(sock, mssg, strlen(mssg), 0);
-printf("exit message sent\n");
-
-// Receive a message from the server.
-int bytes_received = recv(sock, buffer, sizeof(buffer), 0);  // Receive data from server
-if (bytes_received <= 0) {  // Check if receiving failed
-    perror("recv(2)");
-    close(sock);
-    return 1;  // Return 1 to indicate failure
-}
+    // Receive the message from the server.
+    int bytes_received = recv(sock, buffer, sizeof(buffer), 0);
+    if (bytes_received <= 0)// Check if receiving failed
+    {
+        perror("recv(2)");
+        close(sock);
+        return 1;
+    }
 
 // Ensure that the buffer is null-terminated to prevent potential segmentation faults (SEGFAULTs) when using the buffer as a string.
-if (buffer[BUFFER_SIZE - 1] != '\0')  // Ensure null-termination of buffer
-    buffer[BUFFER_SIZE - 1] = '\0';
+    if (buffer[BUFFER_SIZE - 1] != '\0')
+        buffer[BUFFER_SIZE- 1] = '\0';
 
-// Close the socket with the server.
-close(sock);  // Close socket connection
-
-fprintf(stdout, "Connection closed!\n");
-
-free(message);  // Free dynamically allocated memory for message
-return 0; 
+    close(sock);// Close the socket with the server.
+    fprintf(stdout, "Connection is closed.\n");
+    free(message);    return 0;
 }
-
-
