@@ -10,7 +10,7 @@
 #include <time.h> // Functions for manipulating time
 #include <stddef.h>
 
-#define BUFFER_SIZE 8192 // Define the buffer size for receiving data
+#define BUFFER_SIZE 65536 // Define the buffer size for receiving data
 
 /**
  * Generates random data of the specified size.
@@ -102,11 +102,11 @@ int main(int argc, char *argv[]){
         close(sock);
         return -1;  // Return -1 to indicate failure
     } 
-    printf("connected to server...\n");
+    printf("connected to Receiver...\n");
 
 // Initialize the option variable to 'yes' to enter the loop at least once
-    char option = 'yes';
-    while (option == 'yes')
+    char option = 'y';
+    while (option == 'y')
     {
         // Send the  data
         int bytes_sent = 0;
@@ -130,7 +130,7 @@ int main(int argc, char *argv[]){
         send(sock, finishMessage, strlen(finishMessage), 0);
 
  // Prompt the user whether they want to send the message again
-        printf("Do you want to send the message again? (yes/no): ");
+        printf("Do you want to send the message again? (y/n): ");
         scanf(" %c", &option);// Read the user's input
          getchar();
     }
@@ -155,6 +155,6 @@ int main(int argc, char *argv[]){
         buffer[BUFFER_SIZE- 1] = '\0';
 
     close(sock);// Close the socket with the server.
-    fprintf(stdout, "Connection is closed.\n");
+    fprintf(stdout, "sender end.\n");
     free(message);    return 0;
 }
