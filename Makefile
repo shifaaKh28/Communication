@@ -1,19 +1,25 @@
-.PHONY: all clean
+CC=gcc
+
+FLAGS=-Wall -g -ggdb3
+
+SENDER= TCP_Sender.o   
+RECEIVER= TCP_Receiver.o 
+
+SENDER_FILES = TCP_Sender.c
+RECEIVER_FILES= TCP_Receiver.c List.c List.h
 
 all: TCP_Receiver TCP_Sender
 
-TCP_Receiver: TCP_Receiver.o
-	@gcc -o TCP_Receiver TCP_Receiver.o
+TCP_Reciver: $(RECEIVER)
+	$(CC) $(FLAGS) -o $@ $^
+TCP_Sender: $(SENDER)
+	$(CC) $(FLAGS) -o $@ $^
+TCP_Sender.o: $(SENDER_FILES)
+	$(CC) $(FLAGS) -c TCP_Sender.c -o $@
+TCP_Reciver.o: $(RECEIVER_FILES)
+	$(CC) $(FLAGS) -c TCP_Receiver.c -o $@	
 
-TCP_Sender: TCP_Sender.o
-	@gcc -o TCP_Sender TCP_Sender.o
-
-TCP_Receiver.o: TCP_Receiver.c
-	@gcc -c TCP_Receiver.c
-
-TCP_Sender.o: TCP_Sender.c
-	@gcc -c TCP_Sender.c
-
+.PHONY: clean all
 
 clean:
-	@rm -f *.o TCP_Receiver TCP_Sender
+	rm -f *.o *.a *.so *.gch  TCP_Receiver TCP_Sender
