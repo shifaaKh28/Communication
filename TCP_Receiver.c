@@ -26,11 +26,12 @@ void closeSockets(int listening_Socket, int client_Socket)
     // Close the listening socket
     close(listening_Socket);
 }
+
 /*
  * Main function to run the TCP receiver program.
  * 
  * This function sets up a listening socket, binds it to the server address, and listens for incoming TCP connections.
- * Upon accepting a connection, it receives data from the client, calculates statistics for each run, and sends back an exit message.
+ * Upon accepting a connection, it receives data from the client, calculates statistics for each run, saves the received data into a file, and sends back an exit message.
  * After processing all runs, it prints statistics including the number of runs, individual run data, and average time and speed.
  * 
  * Parameters:
@@ -46,22 +47,21 @@ int main(int argc, char *argv[]) {
      // Define the exit message to be sent to client
     char *message = "exit\n";
 
-/*
- * Structure representing the server address.
- */
-   struct sockaddr_in serverAddr;
-   // Initialize the server address structure to zero
-   memset(&serverAddr, 0, sizeof(serverAddr));
+    /*
+     * Structure representing the server address.
+     */
+    struct sockaddr_in serverAddr;
+    // Initialize the server address structure to zero
+    memset(&serverAddr, 0, sizeof(serverAddr));
 
+    /*
+     * Structure representing the client address.
+     */
+    struct sockaddr_in clientAddr;
+    // Initialize the length of the client address structure
+    socklen_t clientAddr_size = sizeof(clientAddr);
 
-/*
- * Structure representing the client address.
- */
-struct sockaddr_in clientAddr;
-// Initialize the length of the client address structure
-socklen_t clientAddr_size = sizeof(clientAddr);
-
-      // Allocate memory for the linked list to store dat
+    // Allocate memory for the linked list to store data
     List *list = List_alloc();
 
     printf("Starting Receiver...\n");
@@ -72,7 +72,7 @@ socklen_t clientAddr_size = sizeof(clientAddr);
         return -1;
     }
 
- // Set the SO_REUSEADDR option to allow reusing the address and port
+    // Set the SO_REUSEADDR option to allow reusing the address and port
     int reusing = 1;
     if (setsockopt(listening_Sock, SOL_SOCKET, SO_REUSEADDR, &reusing, sizeof(int)) == -1) 
     {
@@ -86,7 +86,7 @@ socklen_t clientAddr_size = sizeof(clientAddr);
     serverAddr.sin_port = htons(atoi(argv[2]));     // Set port number from command-line argument
     serverAddr.sin_addr.s_addr = INADDR_ANY;        // Bind to all available network interfaces
 
-  // Bind the server address to the socket.
+    // Bind the server address to the socket.
     if (bind(listening_Sock, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) == -1) 
     {
         perror("bind() failed");
@@ -101,7 +101,6 @@ socklen_t clientAddr_size = sizeof(clientAddr);
     }
 
     printf("Waiting for TCP-connections...\n");
-
 
     while (1)  // Loop to accept multiple connections
     {
@@ -119,21 +118,29 @@ socklen_t clientAddr_size = sizeof(clientAddr);
         // Receive the data from the client(Sender).
         char buffer[BUFFER_SIZE] = {0};
 
-       // Create a counter to keep track of run number
+        // Create a counter to keep track of run number
         int counter = 1;
 
-/*
- * Loop to receive data from the client.
- * This loop continuously receives data from the client until a termination condition is met.
- * It clears the buffer, captures the start time, and then receives data in chunks using the recv function.
- * If it's the first round of receiving data, it captures the start time.
- * If a termination command ("Finish\n" or "Exit\n") is received, the loop exits.
- */
+        FILE *file = fopen("received_data.txt", "w"); // Open the file in write mode
+
+        if (file == NULL) {
+            perror("Error opening file");
+            closeSockets(listening_Sock, clientSocket);
+            return -1;
+        }
+
+        /*
+         * Loop to receive data from the client.
+         * This loop continuously receives data from the client until a termination condition is met.
+         * It clears the buffer, captures the start time, and then receives data in chunks using the recv function.
+         * If it's the first round of receiving data, it captures the start time.
+         * If a termination command ("Finish\n" or "Exit\n") is received, the loop exits.
+         */
         do
         {
             memset(buffer, 0, sizeof(buffer)); // Clear the buffer
             clock_t start_time, end_time;
-  // Variables to  keep track bytes received and other parameters
+            // Variables to keep track bytes received and other parameters
             int bytes;
             int curr = 1;
             int totalBytes = 0;
@@ -143,44 +150,31 @@ socklen_t clientAddr_size = sizeof(clientAddr);
                 {
                     start_time = clock();
                 }
-                  // Check if the "Finish" or "Exit" command is received
+                // Check if the "Finish" or "Exit" command is received
                 if ((strstr(buffer, "Finish\n") != NULL) || (strstr(buffer, "Exit\n") != NULL))
                 {
                     printf("File transfer completed.\n");
                     break;
                 }
-                // Handle the receives data
-                if (bytes < 0) 
-                {
-                    perror("recv(2)");
-                    closeSockets(listening_Sock, clientSocket);
-                    return 1;
-                } else if (bytes == 0) 
-                {
-                   // Handle client disconnection
-                    closeSockets(listening_Sock, clientSocket);
-                    break;
-                } else 
-                {
-                    if (buffer[BUFFER_SIZE - 1] != '\0')
-                        buffer[BUFFER_SIZE - 1] = '\0';
-                }
-
+                // Write the received data to the file
+                fwrite(buffer, 1, bytes, file);
+                
                 curr = 0;
                 // Update total bytes received and clear the buffer
                 totalBytes += bytes;
                 bzero(buffer, BUFFER_SIZE); 
             }
             end_time = clock();
-            printf("the total bytes have been received is: %d\n", totalBytes);
+            printf("The total bytes received are: %d\n", totalBytes);
 
-           
             double ms = ((double)(end_time - start_time) / CLOCKS_PER_SEC) * 1000.0;
 
             List_insertLast(list, counter, ms, bytes / ms);
             fprintf(stdout, "Run #%d Data: Time: %fms Speed: %fMB/s\n", counter, ms, bytes / ms);
             counter++;
         } while (strstr(buffer, "Exit\n") == NULL);
+
+        fclose(file); // Close the file after receiving data
 
         int bytes_sent = send(clientSocket, message, strlen(message), 0);
         printf("Sender sent exit message\n");// Send an exit message to the client
@@ -191,15 +185,15 @@ socklen_t clientAddr_size = sizeof(clientAddr);
             closeSockets(listening_Sock, clientSocket);
             return 1;
         }
-// Close the sockets after communication with the client is done
+        // Close the sockets after communication with the client is done
         closeSockets(listening_Sock, clientSocket);
         fprintf(stdout, "Client %s:%d disconnected\n", inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
         break;
     }
 
-    fprintf(stdout, "finished!\n\n");
+    fprintf(stdout, "Finished!\n\n");
 
-// Print statistics
+    // Print statistics
     printf("-----------------------------\n");
     printf("Statistics:\n");
     printf("Algorithm is: %s\n", argv[4]);
@@ -213,7 +207,7 @@ socklen_t clientAddr_size = sizeof(clientAddr);
         node = node->next;
     }
 
-// Calculate and print average time and bandwidth
+    // Calculate and print average time and bandwidth
     node = list->_head;
     float avgTime = 0.0;
     float avgSpeed = 0.0;
@@ -224,15 +218,14 @@ socklen_t clientAddr_size = sizeof(clientAddr);
         avgSpeed += node->speed;
         node = node->next;
     }
-   float averageTime = avgTime / (list->_size );
-float averageBandwidth = avgSpeed / (list->_size);
+    float averageTime = avgTime / (list->_size );
+    float averageBandwidth = avgSpeed / (list->_size);
 
-printf("Average Time: %f ms\n", averageTime);
-printf("Average Bandwidth: %f MB/s\n", averageBandwidth);
-printf("-----------------------------\n");
-printf("Receiver end.\n");
+    printf("Average Time: %f ms\n", averageTime);
+    printf("Average Bandwidth: %f MB/s\n", averageBandwidth);
+    printf("-----------------------------\n");
+    printf("Receiver end.\n");
 
-    List_free(list);// Free the memory allocated for the linked list
+    List_free(list); // Free the memory allocated for the linked list
     return 0;
-
 }
